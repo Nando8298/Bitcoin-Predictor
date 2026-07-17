@@ -7,7 +7,8 @@ import os
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
-
+WINDOW = 200
+COIN = "BTC-USD"
 model = "btc_model.h5"
 data = pd.read_csv("btc.csv")
 x_test = []
@@ -18,6 +19,7 @@ def main():
     print("1. Predict Bitcoin Price")
     print("2. Exit")
     print("3. Predict by Date")
+    print("4. Update Model")
     choice = input("Enter your choice: ")
     if choice == "1":
         predict_price()
@@ -25,8 +27,8 @@ def main():
         exit()
     elif choice == "3":
         predict_by_date()
-    else:
-        print("Invalid choice. Please try again.")
+    elif choice == "4":
+        update_model()
         main()
 
 
@@ -54,6 +56,11 @@ def predict_price():
     y_pred = mod.predict(x_test)
     result = scaler.inverse_transform(y_pred)
     print(result)
+    x = input("again? y/n")
+    if x == "y":
+        main()
+    else:
+        exit()
     #scaler.fit_transform(target) #Pakai seluruh data
 
 def predict_by_date():
@@ -61,6 +68,8 @@ def predict_by_date():
     date = dt.datetime.strptime(date, "%Y-%m-%d")
     lastdate = dt.datetime(2026,7,14)
     delta = (date - lastdate).days
+    #if delta < 0:
+    #    print("")
     scaler = MinMaxScaler(feature_range=(0,1))
     mod = load_model(model)
     target = data[['Close']]
@@ -80,7 +89,36 @@ def predict_by_date():
     else:
         exit()
 
-    
+def update_model(epochs=10, window=WINDOW):
+    global data
+    fresh = yf.download(COIN, start=dt.datetime(2024, 1, 1), end=dt.datetime.now())
+    fresh = fresh.reset_index()
+    fresh.to_csv("btc.csv", index=False)
+    data = fresh
+    print("Updating model...")
+
+    target = data[["Close"]]
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    scaled = scaler.fit_transform(target)
+
+    x_train = []
+    y_train = []
+
+    for i in range(window, len(scaled)):
+        x_train.append(scaled[i - window:i])
+        y_train.append(scaled[i, 0])
+
+    x_train = np.array(x_train)
+    y_train = np.array(y_train)
+
+
+
+    mod = tf.keras.models.load_model(model, compile=False)
+    mod.compile(optimizer=tf.keras.optimizers.Adam(), loss="mean_squared_error")
+    mod.fit(x_train, y_train, epochs=epochs)
+    mod.save(model)
+    print("Model updated.")
+  
 
 
 main()
