@@ -16,6 +16,8 @@ y_test = []
 
 def main():
     print("Welcome to the Bitcoin Predictor!")
+    date = data["Date"].tail(1)
+    print(f"Last update : {date}")
     print("1. Predict Bitcoin Price")
     print("2. Exit")
     print("3. Predict by Date")
@@ -66,10 +68,17 @@ def predict_price():
 def predict_by_date():
     date = input("Date (YYYY-MM-DD):")
     date = dt.datetime.strptime(date, "%Y-%m-%d")
-    lastdate = dt.datetime(2026,7,14)
+    lastdate = data['Date'].tail(1)
     delta = (date - lastdate).days
-    #if delta < 0:
-    #    print("")
+    if delta <= 0:
+        print(f"Please enter a date after {lastdate.strftime('%Y-%m-%d')}.")
+        x = input("Try again? y/n: ")
+        if x == "y":
+            predict_by_date()
+        else:
+            exit()
+        return
+
     scaler = MinMaxScaler(feature_range=(0,1))
     mod = load_model(model)
     target = data[['Close']]
@@ -93,6 +102,8 @@ def update_model(epochs=10, window=WINDOW):
     global data
     fresh = yf.download(COIN, start=dt.datetime(2024, 1, 1), end=dt.datetime.now())
     fresh = fresh.reset_index()
+    if isinstance(fresh.columns, pd.MultiIndex):
+        fresh.columns = fresh.columns.get_level_values(0)
     fresh.to_csv("btc.csv", index=False)
     data = fresh
     print("Updating model...")
